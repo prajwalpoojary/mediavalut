@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { listAssets } from '@/api/client';
 import type { Asset, AssetQuery } from '@/lib/types';
 
@@ -22,11 +22,16 @@ export function useAssets(query: AssetQuery) {
     loading: true,
     error: null,
   });
+  const latestRequestId = useRef(0);
 
   useEffect(() => {
+    const requestId = ++latestRequestId.current;
     setState((s) => ({ ...s, loading: true, error: null }));
     listAssets(query)
       .then((page) => {
+        if (requestId !== latestRequestId.current) {
+          return;
+        }
         setState({
           items: page.items,
           total: page.total,
@@ -36,6 +41,9 @@ export function useAssets(query: AssetQuery) {
         });
       })
       .catch((err: unknown) => {
+        if (requestId !== latestRequestId.current) {
+          return;
+        }
         setState((s) => ({
           ...s,
           loading: false,
