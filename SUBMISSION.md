@@ -26,8 +26,14 @@ Roughly, and how you split it.
 
 | # | Defect | Where | Fixed / left / out of scope |
 | --- | --- | --- | --- |
-| 1 | Bulk update sends >50 ids in one call | `App.tsx` | |
-| 2 | | | |
+| 1 | No request identity: an older `GET /api/assets` response can resolve after a newer one and overwrite its state, since the effect only compares whether `JSON.stringify(query)` changed, not which request was issued last | `useAssets.ts` | Left |
+| 2 | Every keystroke fires a request with no debounce, so a 6-character query can send 6 requests and burn through the 80-req/10s budget fast | `useAssets.ts` (caller in `App.tsx`) | Left |
+| 3 | No `AbortController` anywhere in the fetch layer — outdated in-flight requests are never cancelled, just ignored once their response lands | `client.ts` | Left |
+| 4 | Bulk update sends every selected id in one call; the API caps bulk-status at 50 ids and returns `400 too_many_ids` above that | `App.tsx` (`applyBulkStatus`) | Left |
+| 5 | List and detail panel are disconnected copies of the same server row: saving a status change in `AssetDetail` never updates the grid behind it (`handleSaved` is a no-op) | `App.tsx` (`handleSaved`) | Left |
+| 6 | Grid is not keyboard-reachable at all — cards only respond to `onClick`/checkbox `onChange`, no `tabIndex`, no arrow-key or Enter/Space handling | `AssetGrid.tsx` | Left |
+| 7 | Toggling one card's selection re-renders the entire list — no memoization, no stable prop references, `selectedIds` passed as a single `Set` that changes identity on every toggle | `AssetGrid.tsx` | Left |
+| 8 | Query state (`q`, `status`, `sort`) lives only in component `useState` — a reload loses the current view, the URL can't be shared, and there's no pagination cursor to invalidate yet when filters change | `App.tsx` | Left |
 
 ---
 
