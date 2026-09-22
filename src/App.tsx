@@ -3,6 +3,7 @@ import { bulkSetStatus } from '@/api/client';
 import { AssetDetail } from '@/features/assets/AssetDetail';
 import { AssetGrid } from '@/features/assets/AssetGrid';
 import { useAssets } from '@/features/assets/useAssets';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { statusLabel } from '@/lib/format';
 import type { Asset, AssetStatus, AssetQuery } from '@/lib/types';
 
@@ -23,7 +24,9 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
 
   // Every keystroke sends a request. Nothing is debounced or cancelled.
-  const { items, total, loading, error } = useAssets({ q, status, sort, limit: 24 });
+  const debouncedQ = useDebouncedValue(q, 300);
+  const query: AssetQuery = { q: debouncedQ, status, sort, limit: 24 };
+  const { items, total, loading, error } = useAssets(query);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {

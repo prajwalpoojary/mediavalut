@@ -27,7 +27,7 @@ Roughly, and how you split it.
 | # | Defect | Where | Fixed / left / out of scope |
 | --- | --- | --- | --- |
 | 1 | No request identity: an older `GET /api/assets` response can resolve after a newer one and overwrite its state, since the effect only compares whether `JSON.stringify(query)` changed, not which request was issued last | `useAssets.ts` | Fixed |
-| 2 | Every keystroke fires a request with no debounce, so a 6-character query can send 6 requests and burn through the 80-req/10s budget fast | `useAssets.ts` (caller in `App.tsx`) | Left |
+| 2 | Every keystroke fires a request with no debounce, so a 6-character query can send 6 requests and burn through the 80-req/10s budget fast | `useAssets.ts` (caller in `App.tsx`) | Fixed |
 | 3 | No `AbortController` anywhere in the fetch layer — outdated in-flight requests are never cancelled, just ignored once their response lands | `client.ts` | Left |
 | 4 | Bulk update sends every selected id in one call; the API caps bulk-status at 50 ids and returns `400 too_many_ids` above that | `App.tsx` (`applyBulkStatus`) | Left |
 | 5 | List and detail panel are disconnected copies of the same server row: saving a status change in `AssetDetail` never updates the grid behind it (`handleSaved` is a no-op) | `App.tsx` (`handleSaved`) | Left |
