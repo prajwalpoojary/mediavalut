@@ -4,6 +4,7 @@ import { AssetDetail } from '@/features/assets/AssetDetail';
 import { AssetGrid } from '@/features/assets/AssetGrid';
 import { useAssets } from '@/features/assets/useAssets';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useUrlState } from '@/lib/useUrlState';
 import { statusLabel } from '@/lib/format';
 import type { Asset, AssetStatus, AssetQuery } from '@/lib/types';
 
@@ -16,16 +17,18 @@ const SORTS: Array<{ value: NonNullable<AssetQuery['sort']>; label: string }> = 
 ];
 
 export function App() {
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState<AssetStatus[]>([]);
-  const [sort, setSort] = useState<NonNullable<AssetQuery['sort']>>('updatedAt:desc');
+  const [urlState, setUrlState] = useUrlState();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Every keystroke sends a request. Nothing is debounced or cancelled.
-  const debouncedQ = useDebouncedValue(q, 300);
-  const query: AssetQuery = { q: debouncedQ, status, sort, limit: 24 };
+  const debouncedQ = useDebouncedValue(urlState.q, 300);
+  const query: AssetQuery = { 
+    q: debouncedQ, 
+    status: urlState.status, 
+    sort: urlState.sort,
+    limit: 24 
+  };
   const { items, total, loading, error } = useAssets(query);
 
   function toggleSelect(id: string) {
@@ -63,10 +66,23 @@ export function App() {
           className="search"
           type="search"
           placeholder="Search assets"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={urlState.q}
+          onChange={(e) => 
+            setUrlState(prev => ({
+              ...prev,
+              q: e.target.value,
+            }))
+          }
         />
-        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+        <select 
+          value={urlState.sort} 
+          onChange={(e) => 
+            setUrlState(prev => ({
+              ...prev,
+              sort: e.target.value as AssetQuery['sort'],
+            }))
+          }
+        >
           {SORTS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -80,11 +96,14 @@ export function App() {
           <label key={s}>
             <input
               type="checkbox"
-              checked={status.includes(s)}
+              checked={urlState.status.includes(s)}
               onChange={(e) =>
-                setStatus((prev) =>
-                  e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
-                )
+                setUrlState((prev) => ({
+                  ...prev,
+                  status: e.target.checked
+                    ? [...prev.status, s]
+                    : prev.status.filter((x) => x !== s),
+                }))
               }
             />
             {statusLabel(s)}

@@ -26,8 +26,8 @@ Roughly, and how you split it.
 
 | # | Defect | Where | Fixed / left / out of scope |
 | --- | --- | --- | --- |
-| 1 | No request identity: an older `GET /api/assets` response can resolve after a newer one and overwrite its state, since the effect only compares whether `JSON.stringify(query)` changed, not which request was issued last | `useAssets.ts` | Fixed |
-| 2 | Every keystroke fires a request with no debounce, so a 6-character query can send 6 requests and burn through the 80-req/10s budget fast | `useAssets.ts` (caller in `App.tsx`) | Fixed |
+| 1 | No request identity: an older `GET /api/assets` response can resolve after a newer one and overwrite its state, since the effect only compares whether `JSON.stringify(query)` changed, not which request was issued last | `useAssets.ts` | Fixed — generation counter in a useRef, compared at response time (live read) against the request's own snapshot (captured at send time), so a superseded request can never win regardless of arrival order |
+| 2 | Every keystroke fires a request with no debounce, so a 6-character query can send 6 requests and burn through the 80-req/10s budget fast | `useAssets.ts` (caller in `App.tsx`) | Fixed — useDebouncedValue (300ms) sits between the raw input and the query passed into useAssets; the input itself still updates every keystroke, only the fetch is delayed |
 | 3 | No `AbortController` anywhere in the fetch layer — outdated in-flight requests are never cancelled, just ignored once their response lands | `client.ts` | Left |
 | 4 | Bulk update sends every selected id in one call; the API caps bulk-status at 50 ids and returns `400 too_many_ids` above that | `App.tsx` (`applyBulkStatus`) | Left |
 | 5 | List and detail panel are disconnected copies of the same server row: saving a status change in `AssetDetail` never updates the grid behind it (`handleSaved` is a no-op) | `App.tsx` (`handleSaved`) | Left |
@@ -53,6 +53,23 @@ six of these is about right.
 **Retry and backoff policy**
 
 **State placement and URL sync**
+
+`q`, `status`, and `sort` live in the URL (`URLSearchParams`), read on mount
+and restored on `popstate`. React `useState` stays the source of truth for
+interaction (controlled inputs need a synchronous value on every keystroke);
+the URL is a one-way mirror written via `history.replaceState` on every
+change, so reload/copy-link/share restores the same view.
+ 
+Rejected: React Router's `useSearchParams`. This is a single-page app with
+no other routes — pulling in a router purely for URL sync would cost bundle
+size (tracked as a submission metric) for ~50 lines of functionality already
+hand-rollable with `URLSearchParams` + a `popstate` listener, which I can
+fully explain line-by-line.
+ 
+`replaceState` (never `pushState`) was a deliberate choice to satisfy the
+literal requirement — "filter changes should not stack up as one history
+entry per keystroke" — without spamming browser history. Known limitation:
+see Trade-offs and cuts.
 
 ---
 
@@ -100,6 +117,17 @@ Screenshots in the repo are welcome — link them here.
 ## Trade-offs and cuts
 
 What you deliberately did not do, and what you would do with another day.
+
+- **URL history granularity.** Filter/search changes always use
+  `history.replaceState`, including meaningful selections (e.g. toggling a
+  status filter), not just keystrokes. This satisfies the literal
+  requirement (no entry per keystroke) but means Back/Forward exits the
+  filtered view in one step rather than stepping back through individual
+  filter changes, the way a real search UI (Gmail, e-commerce filters)
+  typically behaves. With another day: debounce the *history commit*
+  separately from the URL *write* — keep `replaceState` while a filter is
+  actively changing, fire one `pushState` once it settles (reusing the same
+  debounce pattern already used for the search fetch).
 
 ## Critique of the API
 
